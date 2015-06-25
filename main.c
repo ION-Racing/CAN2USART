@@ -144,11 +144,34 @@ void CAN_Config(void){
 
 	// Enable CAN1 FIFO0 Message pending interrupt
 	CAN_ITConfig(CAN1, CAN_IT_FMP0, ENABLE);
+}
 
+uint8_t CANTx(uint32_t address, uint8_t length, uint8_t data[8]) {
+
+	CanTxMsg msg;
+	msg.StdId 	= address;
+	msg.IDE 	= CAN_Id_Standard;
+	msg.RTR		= CAN_RTR_Data;
+	msg.DLC		= length;
+
+	uint8_t i = 0;
+	for(i=0; i<length; i++){
+		msg.Data[i] = data[i];
+	}
+
+	return CAN_Transmit(CAN1, &msg);
 }
 
 void USART_Configuration(void)
 {
+    // NVIC
+	NVIC_InitTypeDef NVIC_InitStructure;
+    NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
 
 	USART_InitTypeDef USART_InitStructure;
@@ -161,10 +184,58 @@ void USART_Configuration(void)
 	USART_Init(USART1, &USART_InitStructure);
 
 	USART_Cmd(USART1, ENABLE);
+
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
 }
 
 void UART_SendByte(char byte){
 	USART_SendData(USART1, byte);
 	while(USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
+}
+
+uint8_t buffer[200];
+uint8_t readingAddress = 0;
+uint8_t state = 0;
+uint8_t current = 0;
+
+#define	RPI_TORQUE_CALIBRATE_MIN	0
+
+void USART1_IRQHandler(void){
+    if ((USART1->SR & USART_FLAG_RXNE) != (u16)RESET)
+    {
+		uint8_t data = USART_ReceiveData(USART1);
+		switch (state) {
+			case 0:
+				if(data == 0xFF) state++;
+				break;
+			case 1:
+				if(data == 0xFF) state++;
+				else state = 0;
+			case 2:
+				readingAddress = data;
+				state++;
+			case 3:
+				buffer[current++] = data;
+				if(current >= 2){
+					state = 0;
+					readingAddress = 0;
+					current = 0;
+
+					RxMessage(readingAddress, buffer[1], buffer[0]);
+				}
+			default:
+				break;
+		}
+	}
+}
+
+void RxMessage(uint8_t address, uint8_t data1, uint8_t data2)
+{
+	if(address == RPI_TORQUE_CALIBRATE_MIN){
+		char data[1];
+		data[1] = 0;
+
+		CANTx(CAN_MSG_PEDAL_CALIBRATE_TORQUE, 1, data);
+	}
 }
 
