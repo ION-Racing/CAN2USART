@@ -54,8 +54,8 @@ void RPI_Send(uint8_t address, uint8_t data1, uint8_t data2){
 	UART_SendByte(0xFF);
 	UART_SendByte(0xFF);
 	UART_SendByte(address);
-	UART_SendByte(data1);
 	UART_SendByte(data2);
+	UART_SendByte(data1);
 }
 
 void GPIO_Configuration(void)
