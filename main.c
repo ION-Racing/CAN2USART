@@ -5,6 +5,7 @@
 #include "stm32f10x_can.h"
 #include "misc.h"
 #include "ION_CAN.h"
+#include "RPI_MSG.h"
 
 void NVIC_Configuration(void);
 void GPIO_Configuration(void);
@@ -45,8 +46,9 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 	}
 	UART_SendByte('\n');*/
 
-	if(RxMessage.StdId == CAN_MSG_PEDAL_THROTTLE){
-		RPI_Send(0x01, RxMessage.Data[0], RxMessage.Data[1]);
+	if(RxMessage.StdId == CAN_MSG_PEDALS){
+		RPI_Send(RPI_TX_TORQUE_PEDAL, RxMessage.Data[0], RxMessage.Data[1]);
+		RPI_Send(RPI_TX_BRAKE_PEDAL, RxMessage.Data[2], RxMessage.Data[3]);
 	}
 }
 
@@ -198,7 +200,6 @@ uint8_t readingAddress = 0;
 uint8_t state = 0;
 uint8_t current = 0;
 
-#define	RPI_TORQUE_CALIBRATE_MIN	0
 
 void USART1_IRQHandler(void){
     if ((USART1->SR & USART_FLAG_RXNE) != (u16)RESET)
@@ -211,9 +212,11 @@ void USART1_IRQHandler(void){
 			case 1:
 				if(data == 0xFF) state++;
 				else state = 0;
+				break;
 			case 2:
 				readingAddress = data;
 				state++;
+				break;
 			case 3:
 				buffer[current++] = data;
 				if(current >= 2){
@@ -223,6 +226,7 @@ void USART1_IRQHandler(void){
 
 					RxMessage(readingAddress, buffer[1], buffer[0]);
 				}
+				break;
 			default:
 				break;
 		}
@@ -231,11 +235,11 @@ void USART1_IRQHandler(void){
 
 void RxMessage(uint8_t address, uint8_t data1, uint8_t data2)
 {
-	if(address == RPI_TORQUE_CALIBRATE_MIN){
-		char data[1];
-		data[1] = 0;
+	if(address == RPI_RX_PEDALS_CALIBRATE){
+		uint8_t data[8];
+		data[0] = data2;
 
-		CANTx(CAN_MSG_PEDAL_CALIBRATE_TORQUE, 1, data);
+		CANTx(CAN_MSG_PEDALS_CALIBRATE, 1, data);
 	}
 }
 
