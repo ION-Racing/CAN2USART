@@ -26,29 +26,35 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 	CanRxMsg RxMessage;
 	CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);
 
-	/*uint8_t i;
-	switch (RxMessage.StdId) {
-	case 0x0FF:
-		UART_SendByte('c');
-		break;
-	case 0x100:
-		UART_SendByte('p');
-		break;
-	case 0x101:
-		UART_SendByte('d');
-		break;
-	default:
-		UART_SendByte('x');
-		break;
+	/* ECU */
+	// Speed
+	if(RxMessage.StdId == CAN_MSG_SPEED){
+		RPI_Send(RPI_TX_SPEED,  RxMessage.Data[0], RxMessage.Data[1]);
 	}
-	for(i = 0; i<RxMessage.DLC; i++){
-	  UART_SendByte(RxMessage.Data[i]);
+	else if(RxMessage.StdId == CAN_ERR_STARTUP){
+		RPI_Send(RPI_TX_ERR_STARTUP,  RxMessage.Data[0], 0x00);
 	}
-	UART_SendByte('\n');*/
 
-	if(RxMessage.StdId == CAN_MSG_PEDALS){
+	/* BMS */
+	// State of charge
+	else if(RxMessage.StdId == CAN_MSG_BMS_CHARGE){
+		RPI_Send(RPI_TX_SOC,  RxMessage.Data[0]);
+	}
+
+	// Voltage
+	else if(RxMessage.StdId == CAN_MSG_BMS_VOLTAGE){
+		RPI_Send(RPI_TX_VOLTAGE,  RxMessage.Data[0]);
+	}
+
+	/* Pedals */
+	// Pedal values
+	else if(RxMessage.StdId == CAN_MSG_PEDALS){
 		RPI_Send(RPI_TX_TORQUE_PEDAL, RxMessage.Data[0], RxMessage.Data[1]);
 		RPI_Send(RPI_TX_BRAKE_PEDAL, RxMessage.Data[2], RxMessage.Data[3]);
+	}
+
+	else if(RxMessage.StdId == CAN_ERR_PEDALS_IMPLAUSIBILITY){
+		RPI_Send(RPI_TX_ERR_PEDAL, RxMessage.Data[0], RxMessage.Data[1]);
 	}
 }
 
